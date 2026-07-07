@@ -1,7 +1,7 @@
 # Alien RPG - MU/TH/UR Terminal
 
 [![Foundry v13+](https://img.shields.io/badge/Foundry-v13%2B-ff6400)](https://foundryvtt.com/)
-[![Version](https://img.shields.io/badge/version-1.1.1-blue)](VERSION)
+[![Version](https://img.shields.io/badge/version-1.1.2-blue)](VERSION)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENCE)
 [![Release](https://img.shields.io/github/v/release/AngryBrit/muthur-terminal)](https://github.com/AngryBrit/muthur-terminal/releases)
 

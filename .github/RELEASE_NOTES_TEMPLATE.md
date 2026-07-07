@@ -19,7 +19,7 @@
 **Manifest URL** (paste into Foundry → Install Module):
 
 ```
-https://github.com/AngryBrit/muthur-terminal/releases/download/v__VERSION__/module.json
+https://github.com/AngryBrit/muthur-terminal/releases/latest/download/module.json
 ```
 
 Or update an existing install from **Manage Modules → Check for Updates**.
