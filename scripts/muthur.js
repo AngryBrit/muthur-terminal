@@ -75,6 +75,17 @@ function localize(key, data = {}) {
   return game.i18n.format(key, data);
 }
 
+/** Resolve world setting text; handles empty values and legacy i18n keys saved before translations loaded. */
+function resolveLocalizedText(value, fallbackKey) {
+  const raw = String(value ?? "").trim();
+  const key = raw || fallbackKey;
+  if (key.startsWith("MUTHUR.")) {
+    const resolved = localize(key);
+    if (resolved !== key) return resolved;
+  }
+  return raw || localize(fallbackKey);
+}
+
 function normalizeCommand(text) {
   return String(text ?? "").trim().toUpperCase().replace(/\s+/g, " ");
 }
@@ -82,7 +93,10 @@ function normalizeCommand(text) {
 function getStatusResponseText() {
   const preset = game.settings.get(MODULE_ID, "statusPreset") ?? "normal";
   if (preset === "custom") {
-    const custom = game.settings.get(MODULE_ID, "statusCustomText")?.trim();
+    const custom = resolveLocalizedText(
+      game.settings.get(MODULE_ID, "statusCustomText"),
+      "MUTHUR.SettingStatusCustomDefault"
+    ).trim();
     return custom || localize("MUTHUR.Commands.status.presets.normal");
   }
   return localize(`MUTHUR.Commands.status.presets.${preset}`);
@@ -331,7 +345,10 @@ class MuthurPlayerApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     if (!this._bootTyped) {
       this._bootTyped = true;
-      const bootText = game.settings.get(MODULE_ID, "bootText");
+      const bootText = resolveLocalizedText(
+        game.settings.get(MODULE_ID, "bootText"),
+        "MUTHUR.SettingBootTextDefault"
+      );
       this.localPending.unshift({
         id: "boot-" + this.id,
         type: "boot",
@@ -360,7 +377,7 @@ class MuthurPlayerApp extends HandlebarsApplicationMixin(ApplicationV2) {
     this._lines = lines;
     return {
       lines,
-      prompt: game.settings.get(MODULE_ID, "prompt") || localize("MUTHUR.DefaultPrompt"),
+      prompt: resolveLocalizedText(game.settings.get(MODULE_ID, "prompt"), "MUTHUR.DefaultPrompt"),
       inputPlaceholder: localize("MUTHUR.InputPlaceholder")
     };
   }
@@ -740,7 +757,7 @@ Hooks.once("init", () => {
     scope: "world",
     config: true,
     type: String,
-    default: game.i18n.localize("MUTHUR.SettingBootTextDefault")
+    default: ""
   });
 
   game.settings.register(MODULE_ID, "prompt", {
@@ -749,7 +766,7 @@ Hooks.once("init", () => {
     scope: "world",
     config: true,
     type: String,
-    default: game.i18n.localize("MUTHUR.DefaultPrompt")
+    default: ""
   });
 
   game.settings.register(MODULE_ID, "typeSpeed", {
@@ -815,7 +832,7 @@ Hooks.once("init", () => {
     scope: "world",
     config: true,
     type: String,
-    default: game.i18n.localize("MUTHUR.SettingStatusCustomDefault")
+    default: ""
   });
 
   game.muthur = {
@@ -829,7 +846,23 @@ Hooks.once("init", () => {
 
 Hooks.once("ready", () => {
   game.socket.on(SOCKET, onSocketEvent);
+  migrateLocalizedSettingDefaults();
 });
+
+const LOCALIZED_SETTING_DEFAULTS = [
+  ["bootText", "MUTHUR.SettingBootTextDefault"],
+  ["prompt", "MUTHUR.DefaultPrompt"],
+  ["statusCustomText", "MUTHUR.SettingStatusCustomDefault"]
+];
+
+/** Clear settings that were persisted as unresolved i18n keys during init. */
+async function migrateLocalizedSettingDefaults() {
+  if (!game.user.isGM) return;
+  for (const [settingKey, i18nKey] of LOCALIZED_SETTING_DEFAULTS) {
+    const value = game.settings.get(MODULE_ID, settingKey);
+    if (value === i18nKey) await game.settings.set(MODULE_ID, settingKey, "");
+  }
+}
 
 Hooks.on("updateSetting", (setting) => {
   const key = setting?.key ?? setting;

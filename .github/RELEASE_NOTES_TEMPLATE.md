@@ -26,7 +26,7 @@ Or update an existing install from **Manage Modules → Check for Updates**.
 
 ## Compatibility
 
-- **Foundry:** v13 minimum, verified on v14.364
+- **Foundry:** v13 minimum, verified on v14
 - **Alien RPG Evolved:** recommended; module is system-agnostic
 
 ## Full Changelog

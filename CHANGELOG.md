@@ -5,6 +5,16 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.6] - 2026-07-07
+
+### Fixed
+
+- Boot text and terminal prompt no longer display raw i18n keys (`MUTHUR.SettingBootTextDefault`, etc.); settings resolve at render time and legacy worlds auto-migrate.
+
+### Changed
+
+- README, release notes template, and manifest description aligned with current features (scripted responses, i18n, v14 compatibility).
+
 ## [1.1.5] - 2026-07-07
 
 ### Added
@@ -74,6 +84,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - English localization (`lang/en.json`).
 - GitHub release packaging and manifest install URLs.
 
+[1.1.6]: https://github.com/AngryBrit/muthur-terminal/releases/tag/v1.1.6
 [1.1.5]: https://github.com/AngryBrit/muthur-terminal/releases/tag/v1.1.5
 [1.1.4]: https://github.com/AngryBrit/muthur-terminal/releases/tag/v1.1.4
 [1.1.3]: https://github.com/AngryBrit/muthur-terminal/releases/tag/v1.1.3
