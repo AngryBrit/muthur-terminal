@@ -6,5 +6,9 @@
   "MUTHUR.SettingTypeSpeedName": "Typing Speed",
   "MUTHUR.SettingTypeSpeedHint": "Milliseconds per character when MU/TH/UR's replies are typed out on your screen. Lower is faster.",
   "MUTHUR.SettingPromptName": "Terminal Prompt",
-  "MUTHUR.SettingPromptHint": "The prompt string shown before the input line, e.g. INTERFACE 2037>"
+  "MUTHUR.SettingPromptHint": "The prompt string shown before the input line, e.g. INTERFACE 2037>",
+  "MUTHUR.SettingTypingSoundsName": "Terminal Sounds",
+  "MUTHUR.SettingTypingSoundsHint": "Play retro keypress, return, and MU/TH/UR reply sounds in the terminal.",
+  "MUTHUR.SettingTypingSoundVolumeName": "Terminal Sound Volume",
+  "MUTHUR.SettingTypingSoundVolumeHint": "Volume for terminal sound effects (0.0 to 1.0)."
 }

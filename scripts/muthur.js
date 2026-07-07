@@ -72,6 +72,129 @@ function formatEntryHtml(entry, { showAuthor = false } = {}) {
 }
 
 /* -------------------------------------------- */
+/*  Terminal sounds (ported from alien-mu-th-ur) */
+/* -------------------------------------------- */
+
+const MuthurSounds = {
+  _replyAudio: null,
+  _continueReply: false,
+  _lastComAt: 0,
+
+  _base(...parts) {
+    return `modules/${MODULE_ID}/sounds/${parts.join("/")}`;
+  },
+
+  isEnabled() {
+    try {
+      return game.settings.get(MODULE_ID, "enableTypingSounds");
+    } catch {
+      return true;
+    }
+  },
+
+  volume() {
+    try {
+      return Number(game.settings.get(MODULE_ID, "typingSoundVolume")) || 0.2;
+    } catch {
+      return 0.2;
+    }
+  },
+
+  async _play(src, { loop = false } = {}) {
+    if (!this.isEnabled()) return;
+    const volume = this.volume();
+    try {
+      if (typeof AudioHelper !== "undefined" && AudioHelper?.play) {
+        return await AudioHelper.play({ src, volume, autoplay: true, loop }, true);
+      }
+    } catch {
+      /* fall through */
+    }
+    const audio = new Audio(src);
+    audio.volume = volume;
+    audio.loop = loop;
+    return audio.play();
+  },
+
+  playTypeSound() {
+    const n = Math.floor(Math.random() * 34) + 1;
+    return this._play(this._base("keypress", `Keypress_${n}.ogg`));
+  },
+
+  playReturnSound() {
+    const n = Math.floor(Math.random() * 19) + 1;
+    return this._play(this._base("Key press return", `Return_beep_${n}.ogg`));
+  },
+
+  playErrorSound() {
+    return this._play(this._base("pec_message", "error.ogg"));
+  },
+
+  playComSound() {
+    const n = Math.floor(Math.random() * 3) + 1;
+    return this._play(this._base("pec_message", `Save_Sound_Communications_${n}.ogg`));
+  },
+
+  playComSoundThrottled(minIntervalMs = 200) {
+    const now = performance?.now?.() ?? Date.now();
+    if (now - this._lastComAt < minIntervalMs) return Promise.resolve();
+    this._lastComAt = now;
+    return this.playComSound();
+  },
+
+  async startReplySound() {
+    if (!this.isEnabled()) return;
+    this._continueReply = true;
+    await this._playReplyOnce();
+  },
+
+  async _playReplyOnce() {
+    if (!this._continueReply || !this.isEnabled()) return;
+    if (this._replyAudio) {
+      this._replyAudio.pause();
+      this._replyAudio.currentTime = 0;
+      this._replyAudio = null;
+    }
+
+    const n = Math.floor(Math.random() * 9) + 1;
+    const src = this._base("reply", `Computer_Reply_${n}.ogg`);
+    const volume = this.volume();
+
+    try {
+      if (typeof AudioHelper !== "undefined" && AudioHelper?.play) {
+        await AudioHelper.play({ src, volume, autoplay: true, loop: false }, true);
+        setTimeout(() => {
+          if (this._continueReply) this._playReplyOnce();
+        }, 900);
+        return;
+      }
+    } catch {
+      /* fall through */
+    }
+
+    const audio = new Audio(src);
+    audio.volume = volume;
+    audio.onended = () => {
+      if (this._continueReply) this._playReplyOnce();
+    };
+    audio.onerror = () => {
+      this._replyAudio = null;
+    };
+    this._replyAudio = audio;
+    return audio.play();
+  },
+
+  stopReplySound() {
+    this._continueReply = false;
+    if (this._replyAudio) {
+      this._replyAudio.pause();
+      this._replyAudio.currentTime = 0;
+      this._replyAudio = null;
+    }
+  }
+};
+
+/* -------------------------------------------- */
 /*  Player Terminal Application                 */
 /* -------------------------------------------- */
 
@@ -102,6 +225,7 @@ class MuthurPlayerApp extends HandlebarsApplicationMixin(ApplicationV2) {
     this.historyIndex = -1;
     this.localPending = [];
     this._animatedIds = new Set();
+    this._heardLineIds = new Set();
     this._bootTyped = false;
   }
 
@@ -164,7 +288,17 @@ class MuthurPlayerApp extends HandlebarsApplicationMixin(ApplicationV2) {
       input.focus();
     }
     this._animateNewOutputLines();
+    this._playNewLineSounds();
     this._scrollToBottom();
+  }
+
+  _playNewLineSounds() {
+    for (const line of this._lines ?? []) {
+      if (this._heardLineIds.has(line.id)) continue;
+      this._heardLineIds.add(line.id);
+      if (line.type === "system") MuthurSounds.playErrorSound();
+      else if (line.type === "boot") MuthurSounds.playComSoundThrottled();
+    }
   }
 
   _animateNewOutputLines() {
@@ -181,14 +315,20 @@ class MuthurPlayerApp extends HandlebarsApplicationMixin(ApplicationV2) {
   }
 
   _typewrite(el, text, speed) {
+    MuthurSounds.startReplySound();
     let i = 0;
     const step = () => {
-      if (!this.element?.isConnected) return;
+      if (!this.element?.isConnected) {
+        MuthurSounds.stopReplySound();
+        return;
+      }
       if (i >= text.length) {
+        MuthurSounds.stopReplySound();
         this._scrollToBottom();
         return;
       }
       const ch = text[i];
+      if (ch === " ") MuthurSounds.playComSoundThrottled();
       if (ch === "\n") el.appendChild(document.createElement("br"));
       else el.appendChild(document.createTextNode(ch));
       i++;
@@ -205,10 +345,14 @@ class MuthurPlayerApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
   _onKeyDown(event) {
     const input = event.currentTarget;
+    if (event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
+      MuthurSounds.playTypeSound();
+    }
     if (event.key === "Enter") {
       event.preventDefault();
       const text = input.value.trim();
       if (!text) return;
+      MuthurSounds.playReturnSound();
       input.value = "";
       this.commandHistory.push(text);
       this.historyIndex = this.commandHistory.length;
@@ -236,6 +380,7 @@ class MuthurPlayerApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     // A couple of purely local, client-side conveniences.
     if (lower === "clear" || lower === "cls") {
+      MuthurSounds.stopReplySound();
       this.localPending = [];
       this._animatedIds.clear();
       this._bootTyped = true; // don't re-show boot text
@@ -243,8 +388,11 @@ class MuthurPlayerApp extends HandlebarsApplicationMixin(ApplicationV2) {
       return;
     }
     if (lower === "help") {
+      const id = foundry.utils.randomID();
+      MuthurSounds.playComSoundThrottled();
+      this._heardLineIds.add(id);
       this.localPending.push({
-        id: foundry.utils.randomID(),
+        id,
         type: "system",
         text: "Local commands: HELP, CLEAR. Anything else is relayed to MU/TH/UR for a response.",
         timestamp: Date.now(),
@@ -281,6 +429,7 @@ class MuthurPlayerApp extends HandlebarsApplicationMixin(ApplicationV2) {
   }
 
   _onClose(options) {
+    MuthurSounds.stopReplySound();
     super._onClose(options);
     if (MuthurPlayerApp.current === this) MuthurPlayerApp.current = null;
   }
@@ -341,6 +490,9 @@ class MuthurGMApp extends HandlebarsApplicationMixin(ApplicationV2) {
     const send = () => this._sendReply();
     sendBtn?.addEventListener("click", send);
     input?.addEventListener("keydown", (event) => {
+      if (event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        MuthurSounds.playTypeSound();
+      }
       if (event.key === "Enter") {
         event.preventDefault();
         send();
@@ -493,6 +645,25 @@ Hooks.once("init", () => {
     config: true,
     type: Number,
     default: 18
+  });
+
+  game.settings.register(MODULE_ID, "enableTypingSounds", {
+    name: "MUTHUR.SettingTypingSoundsName",
+    hint: "MUTHUR.SettingTypingSoundsHint",
+    scope: "client",
+    config: true,
+    type: Boolean,
+    default: true
+  });
+
+  game.settings.register(MODULE_ID, "typingSoundVolume", {
+    name: "MUTHUR.SettingTypingSoundVolumeName",
+    hint: "MUTHUR.SettingTypingSoundVolumeHint",
+    scope: "client",
+    config: true,
+    type: Number,
+    range: { min: 0, max: 1, step: 0.1 },
+    default: 0.2
   });
 
   game.muthur = {
