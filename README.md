@@ -1,4 +1,4 @@
-# MU/TH/UR Terminal
+# Alien RPG - MU/TH/UR Terminal
 
 [![Foundry v13+](https://img.shields.io/badge/Foundry-v13%2B-ff6400)](https://foundryvtt.com/)
 [![Version](https://img.shields.io/badge/version-1.1.1-blue)](VERSION)
