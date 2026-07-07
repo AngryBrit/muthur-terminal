@@ -1,23 +1,35 @@
 {
   "id": "muthur-terminal",
   "title": "Alien RPG - MU/TH/UR Terminal",
-  "description": "A fully interactive MU/TH/UR terminal for Alien RPG Evolved. Players get a retro CRT terminal window they can type into; the GM gets a companion console to read every query and type MU/TH/UR's replies live, broadcast system messages, and force-open terminals on players' screens.",
+  "description": "<p>A fully interactive MU/TH/UR terminal for Alien RPG Evolved. Players get a retro CRT terminal window they can type into; the GM gets a companion console to read every query and type MU/TH/UR's replies live, broadcast system messages, and force-open terminals on players' screens.</p>",
   "version": "1.1.2",
   "compatibility": {
     "minimum": "13",
     "verified": "14.364"
   },
   "authors": [
-    { "name": "AngryBrit" }
+    {
+      "name": "AngryBrit",
+      "url": "https://github.com/AngryBrit/",
+      "discord": "AngryBrit",
+      "flags": {}
+    }
   ],
   "esmodules": [
     "scripts/muthur.js"
   ],
   "styles": [
-    "styles/muthur.css"
+    {
+      "src": "styles/muthur.css"
+    }
   ],
   "languages": [
-    { "lang": "en", "name": "English", "path": "lang/en.json" }
+    {
+      "lang": "en",
+      "name": "English",
+      "path": "lang/en.json",
+      "flags": {}
+    }
   ],
   "socket": true,
   "url": "https://github.com/angrybrit/muthur-terminal",
