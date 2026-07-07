@@ -1,0 +1,212 @@
+/* ===== MU/TH/UR Terminal ===== */
+
+.application.muthur-window .window-content {
+  padding: 0;
+  background: #000;
+}
+
+.muthur-app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  background: #000;
+  font-family: "Consolas", "Courier New", ui-monospace, monospace;
+}
+
+.muthur-crt {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: radial-gradient(ellipse at center, #001a05 0%, #000700 100%);
+  color: #33ff5c;
+  padding: 14px 16px;
+  overflow: hidden;
+  box-shadow: inset 0 0 60px rgba(0, 0, 0, 0.85);
+}
+
+.muthur-crt::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0) 0px,
+    rgba(0, 0, 0, 0) 1px,
+    rgba(0, 0, 0, 0.25) 2px,
+    rgba(0, 0, 0, 0.25) 3px
+  );
+  mix-blend-mode: multiply;
+  z-index: 2;
+}
+
+.muthur-crt::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, rgba(51, 255, 92, 0.04) 0%, rgba(0,0,0,0.35) 100%);
+  animation: muthur-flicker 5s infinite;
+  z-index: 3;
+}
+
+@keyframes muthur-flicker {
+  0%, 96%, 100% { opacity: 1; }
+  97% { opacity: 0.86; }
+  98% { opacity: 1; }
+  99% { opacity: 0.92; }
+}
+
+.muthur-log {
+  flex: 1;
+  overflow-y: auto;
+  font-size: 15px;
+  line-height: 1.5;
+  text-shadow: 0 0 4px rgba(51, 255, 92, 0.75), 0 0 10px rgba(51, 255, 92, 0.35);
+  white-space: normal;
+  z-index: 1;
+}
+
+.muthur-log::-webkit-scrollbar {
+  width: 8px;
+}
+.muthur-log::-webkit-scrollbar-thumb {
+  background: rgba(51, 255, 92, 0.35);
+  border-radius: 4px;
+}
+.muthur-log::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.muthur-line {
+  margin-bottom: 4px;
+  word-wrap: break-word;
+}
+
+.muthur-type-boot { color: #1fae40; opacity: 0.85; }
+.muthur-type-system { color: #ffcc33; text-shadow: 0 0 6px rgba(255, 204, 51, 0.6); }
+.muthur-type-input { color: #b6ffca; }
+.muthur-type-output { color: #33ff5c; }
+
+.muthur-caret { color: #7dffa0; font-weight: bold; }
+.muthur-tag { color: #ffcc33; font-weight: bold; margin-right: 2px; }
+.muthur-tag.muthur-sys { color: #ff6a4d; }
+.muthur-author { color: #7dffa0; opacity: 0.8; }
+
+.muthur-inputrow {
+  display: flex;
+  align-items: center;
+  border-top: 1px solid rgba(51, 255, 92, 0.3);
+  padding-top: 8px;
+  margin-top: 6px;
+  z-index: 1;
+}
+
+.muthur-prompt {
+  color: #7dffa0;
+  margin-right: 6px;
+  font-weight: bold;
+  text-shadow: 0 0 6px rgba(51, 255, 92, 0.6);
+  white-space: nowrap;
+}
+
+.muthur-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #b6ffca;
+  font-family: inherit;
+  font-size: 15px;
+  text-shadow: 0 0 4px rgba(51, 255, 92, 0.6);
+  caret-color: #33ff5c;
+}
+
+.muthur-cursor {
+  color: #33ff5c;
+  animation: muthur-blink 1s steps(1) infinite;
+  margin-left: 2px;
+}
+
+@keyframes muthur-blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+/* ===== GM Console ===== */
+
+.muthur-gm {
+  height: 100%;
+}
+
+.muthur-gm-crt {
+  flex: 1;
+  min-height: 0;
+}
+
+.muthur-gm-controls {
+  display: flex;
+  gap: 6px;
+  padding: 8px;
+  background: #0a0a0a;
+  border-top: 1px solid rgba(51, 255, 92, 0.3);
+}
+
+.muthur-target {
+  flex: 0 0 160px;
+  background: #111;
+  color: #33ff5c;
+  border: 1px solid rgba(51, 255, 92, 0.4);
+  font-family: inherit;
+  font-size: 12px;
+}
+
+.muthur-gm-input {
+  flex: 1;
+  background: #111;
+  color: #b6ffca;
+  border: 1px solid rgba(51, 255, 92, 0.4);
+  padding: 4px 8px;
+  font-family: inherit;
+}
+
+.muthur-gm-send {
+  background: #113a1c;
+  color: #33ff5c;
+  border: 1px solid rgba(51, 255, 92, 0.5);
+  cursor: pointer;
+  width: 36px;
+}
+.muthur-gm-send:hover {
+  background: #17552a;
+}
+
+.muthur-gm-toolbar {
+  display: flex;
+  gap: 6px;
+  padding: 0 8px 8px 8px;
+  background: #0a0a0a;
+  flex-wrap: wrap;
+}
+
+.muthur-gm-toolbar button {
+  flex: 1;
+  min-width: 150px;
+  background: #111;
+  color: #cfd8dc;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  font-size: 12px;
+  padding: 5px 8px;
+  cursor: pointer;
+}
+.muthur-gm-toolbar button:hover {
+  background: #1c1c1c;
+  color: #fff;
+}
+
+.muthur-clear:hover {
+  border-color: #ff6a4d;
+  color: #ff6a4d;
+}

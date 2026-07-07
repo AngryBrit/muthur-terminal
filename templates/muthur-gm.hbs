@@ -1,0 +1,32 @@
+<div class="muthur-app muthur-gm">
+  <div class="muthur-crt muthur-gm-crt">
+    <div class="muthur-log">
+      {{#each lines}}
+      <div class="muthur-line muthur-type-{{this.type}}">{{{this.html}}}</div>
+      {{/each}}
+    </div>
+  </div>
+  <div class="muthur-gm-controls">
+    <select class="muthur-target" title="Who should see this reply">
+      <option value="all">ALL TERMINALS</option>
+      {{#each users}}
+      <option value="{{this.id}}">{{this.name}}{{#unless this.active}} (offline){{/unless}}</option>
+      {{/each}}
+    </select>
+    <input type="text" class="muthur-gm-input" placeholder="Type MU/TH/UR's response and press Enter..." autocomplete="off" spellcheck="false" />
+    <button type="button" class="muthur-gm-send" title="Send">
+      <i class="fa-solid fa-paper-plane"></i>
+    </button>
+  </div>
+  <div class="muthur-gm-toolbar">
+    <button type="button" class="muthur-force-open">
+      <i class="fa-solid fa-desktop"></i> Force-Open All Terminals
+    </button>
+    <button type="button" class="muthur-system-msg">
+      <i class="fa-solid fa-triangle-exclamation"></i> Send System Alert
+    </button>
+    <button type="button" class="muthur-clear">
+      <i class="fa-solid fa-trash"></i> Clear Transcript
+    </button>
+  </div>
+</div>

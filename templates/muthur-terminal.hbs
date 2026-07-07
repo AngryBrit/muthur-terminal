@@ -1,0 +1,14 @@
+<div class="muthur-app">
+  <div class="muthur-crt">
+    <div class="muthur-log">
+      {{#each lines}}
+      <div class="muthur-line muthur-type-{{this.type}}" data-id="{{this.id}}">{{{this.html}}}</div>
+      {{/each}}
+    </div>
+    <div class="muthur-inputrow">
+      <span class="muthur-prompt">{{prompt}}</span>
+      <input type="text" class="muthur-input" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Type a command..." />
+      <span class="muthur-cursor">&#9608;</span>
+    </div>
+  </div>
+</div>

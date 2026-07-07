@@ -1,0 +1,10 @@
+{
+  "MUTHUR.OpenTerminal": "MU/TH/UR Terminal",
+  "MUTHUR.OpenConsole": "MU/TH/UR Console (GM)",
+  "MUTHUR.SettingBootTextName": "Boot Text",
+  "MUTHUR.SettingBootTextHint": "The text shown when a player's terminal first boots up in a session.",
+  "MUTHUR.SettingTypeSpeedName": "Typing Speed",
+  "MUTHUR.SettingTypeSpeedHint": "Milliseconds per character when MU/TH/UR's replies are typed out on your screen. Lower is faster.",
+  "MUTHUR.SettingPromptName": "Terminal Prompt",
+  "MUTHUR.SettingPromptHint": "The prompt string shown before the input line, e.g. INTERFACE 2037>"
+}
