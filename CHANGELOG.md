@@ -11,6 +11,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Nothing yet.
 
+## [1.1.0] - 2026-07-07
+
+### Added
+
+- Scripted auto-responses for `STATUS`, `TIME`, `DATE`, `CREW`, `MANIFEST`, `LOCATION`, `VERSION`, `INTERFACE`, and `ORDERS`.
+- World settings: scripted responses toggle, STATUS preset, and custom STATUS text.
+- Expanded `HELP` command listing all available commands.
+
+### Changed
+
+- GitHub project documentation (`AUTHORS`, `CHANGELOG`, `LICENCE`, `VERSION`, release templates).
+- README expanded with manifest install, usage tables, and configuration guide.
+
 ## [1.0.0] - 2026-07-07
 
 ### Added
@@ -30,5 +43,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - English localization (`lang/en.json`).
 - GitHub release packaging and manifest install URLs.
 
-[Unreleased]: https://github.com/AngryBrit/muthur-terminal/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/AngryBrit/muthur-terminal/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/AngryBrit/muthur-terminal/releases/tag/v1.1.0
 [1.0.0]: https://github.com/AngryBrit/muthur-terminal/releases/tag/v1.0.0
