@@ -5,6 +5,14 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] - 2026-07-07
+
+### Changed
+
+- Module title updated to **Alien RPG - MU/TH/UR Terminal**.
+- Declared `alienrpg` system relationship in `module.json` for Foundry's module browser.
+- Removed empty Unreleased section from changelog.
+
 ## [1.1.0] - 2026-07-07
 
 ### Added
@@ -37,5 +45,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - English localization (`lang/en.json`).
 - GitHub release packaging and manifest install URLs.
 
+[1.1.1]: https://github.com/AngryBrit/muthur-terminal/releases/tag/v1.1.1
 [1.1.0]: https://github.com/AngryBrit/muthur-terminal/releases/tag/v1.1.0
 [1.0.0]: https://github.com/AngryBrit/muthur-terminal/releases/tag/v1.0.0
