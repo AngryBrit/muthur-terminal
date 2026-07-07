@@ -85,6 +85,26 @@
   word-wrap: break-word;
 }
 
+.muthur-line-body {
+  display: block;
+}
+
+.muthur-line-row {
+  display: block;
+  min-height: 1.5em;
+}
+
+.muthur-scanline-sweep {
+  position: absolute;
+  top: 0;
+  left: 100%;
+  height: 1.5em;
+  pointer-events: none;
+  z-index: 10;
+  filter: blur(2px) brightness(1.5);
+  opacity: 1;
+}
+
 .muthur-type-boot { color: #1fae40; opacity: 0.85; }
 .muthur-type-system { color: #ffcc33; text-shadow: 0 0 6px rgba(255, 204, 51, 0.6); }
 .muthur-type-input { color: #b6ffca; }
@@ -135,11 +155,207 @@
   50%, 100% { opacity: 0; }
 }
 
-/* ===== GM Console ===== */
+.muthur-waiting-screen {
+  justify-content: center;
+  align-items: center;
+}
+
+.muthur-waiting-content {
+  z-index: 1;
+  text-align: center;
+  max-width: 420px;
+  padding: 24px 16px;
+}
+
+.muthur-waiting-title {
+  margin: 0 0 16px 0;
+  font-size: 20px;
+  font-weight: bold;
+  color: #33ff5c;
+  text-shadow: 0 0 8px rgba(51, 255, 92, 0.6);
+}
+
+.muthur-waiting-message {
+  margin: 0 0 10px 0;
+  font-size: 15px;
+  line-height: 1.5;
+  color: #b6ffca;
+}
+
+.muthur-waiting-detail {
+  margin: 0 0 20px 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #7dffa0;
+  opacity: 0.85;
+}
+
+.muthur-waiting-dots {
+  font-size: 28px;
+  line-height: 1;
+  color: #33ff5c;
+  letter-spacing: 4px;
+  min-height: 1em;
+}
+
+/* ===== Full boot screen ===== */
+
+.muthur-boot-screen {
+  position: relative;
+  justify-content: center;
+  align-items: stretch;
+  overflow: hidden;
+}
+
+.muthur-boot-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+  background:
+    linear-gradient(rgba(18, 16, 16, 0.08) 50%, rgba(0, 255, 92, 0.06) 50%),
+    linear-gradient(90deg, rgba(255, 0, 0, 0.05), rgba(0, 255, 92, 0.04), rgba(0, 0, 255, 0.05));
+  background-size: 100% 3px, 3px 100%;
+  mix-blend-mode: screen;
+  opacity: 0.45;
+  animation: muthur-boot-flicker 0.15s infinite;
+}
+
+.muthur-boot-scanline {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: rgba(51, 255, 92, 0.25);
+  pointer-events: none;
+  z-index: 3;
+  animation: muthur-boot-scan 2s linear infinite;
+}
+
+@keyframes muthur-boot-flicker {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 0.38; }
+}
+
+@keyframes muthur-boot-scan {
+  0% { top: 0; }
+  100% { top: 100%; }
+}
+
+.muthur-boot-content {
+  position: relative;
+  z-index: 4;
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px 20px 24px;
+  text-align: center;
+}
+
+.muthur-boot-logo {
+  display: block;
+  width: min(100%, 300px);
+  height: auto;
+  margin: 0 auto 20px;
+  padding: 0;
+  object-fit: contain;
+  filter: drop-shadow(0 0 10px rgba(51, 255, 92, 0.85)) drop-shadow(0 0 24px rgba(51, 255, 92, 0.4));
+  opacity: 0;
+  animation: muthur-boot-logo-in 1.5s ease forwards;
+}
+
+@keyframes muthur-boot-logo-in {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.muthur-boot-messages {
+  width: 100%;
+  max-width: 560px;
+}
+
+.muthur-boot-line {
+  margin: 0.35em 0;
+  font-size: 16px;
+  font-weight: bold;
+  line-height: 1.45;
+  color: #33ff5c;
+  text-shadow: 0 0 6px rgba(51, 255, 92, 0.65);
+  min-height: 1.45em;
+}
+
+.muthur-boot-line-custom {
+  color: #1fae40;
+  font-size: 14px;
+  font-weight: normal;
+}
+
+.muthur-boot-glitch {
+  transform: skewX(12deg);
+  filter: brightness(1.35);
+}
+
+.muthur-boot-screen.muthur-boot-powerdown .muthur-boot-content {
+  animation: muthur-boot-collapse 0.4s ease-in forwards;
+}
+
+.muthur-boot-screen.muthur-boot-powerdown {
+  animation: muthur-boot-flash 0.45s ease forwards;
+}
+
+@keyframes muthur-boot-collapse {
+  to {
+    transform: scaleY(0.02);
+    opacity: 0.2;
+  }
+}
+
+@keyframes muthur-boot-flash {
+  0% { background: radial-gradient(ellipse at center, #001a05 0%, #000700 100%); }
+  35% { background: #33ff5c; }
+  100% { background: radial-gradient(ellipse at center, #001a05 0%, #000700 100%); opacity: 0; }
+}
+
+/* ===== GM Console (orange) ===== */
+
+#muthur-terminal-gm .window-header {
+  background: #1a0f00;
+  border-bottom-color: rgba(255, 153, 0, 0.45);
+  color: #ff9900;
+}
 
 .muthur-gm {
   height: 100%;
 }
+
+.muthur-gm .muthur-crt {
+  background: radial-gradient(ellipse at center, #1a0f00 0%, #0a0700 100%);
+  color: #ff9900;
+}
+
+.muthur-gm .muthur-crt::after {
+  background: radial-gradient(ellipse at center, rgba(255, 153, 0, 0.05) 0%, rgba(0, 0, 0, 0.35) 100%);
+}
+
+.muthur-gm .muthur-log {
+  text-shadow: 0 0 4px rgba(255, 153, 0, 0.75), 0 0 10px rgba(255, 153, 0, 0.35);
+}
+
+.muthur-gm .muthur-log::-webkit-scrollbar-thumb {
+  background: rgba(255, 153, 0, 0.35);
+}
+
+.muthur-gm .muthur-type-boot { color: #cc7a00; opacity: 0.85; }
+.muthur-gm .muthur-type-system { color: #ffcc33; text-shadow: 0 0 6px rgba(255, 204, 51, 0.6); }
+.muthur-gm .muthur-type-input { color: #ffb84d; }
+.muthur-gm .muthur-type-output { color: #ff9900; }
+
+.muthur-gm .muthur-caret { color: #ffb84d; }
+.muthur-gm .muthur-tag { color: #ffcc33; }
+.muthur-gm .muthur-tag.muthur-sys { color: #ff6a4d; }
+.muthur-gm .muthur-author { color: #ffb84d; opacity: 0.8; }
 
 .muthur-gm-crt {
   flex: 1;
@@ -150,15 +366,15 @@
   display: flex;
   gap: 6px;
   padding: 8px;
-  background: #0a0a0a;
-  border-top: 1px solid rgba(51, 255, 92, 0.3);
+  background: #0a0700;
+  border-top: 1px solid rgba(255, 153, 0, 0.35);
 }
 
 .muthur-target {
   flex: 0 0 160px;
   background: #111;
-  color: #33ff5c;
-  border: 1px solid rgba(51, 255, 92, 0.4);
+  color: #ff9900;
+  border: 1px solid rgba(255, 153, 0, 0.45);
   font-family: inherit;
   font-size: 12px;
 }
@@ -166,28 +382,29 @@
 .muthur-gm-input {
   flex: 1;
   background: #111;
-  color: #b6ffca;
-  border: 1px solid rgba(51, 255, 92, 0.4);
+  color: #ffb84d;
+  border: 1px solid rgba(255, 153, 0, 0.45);
   padding: 4px 8px;
   font-family: inherit;
+  caret-color: #ff9900;
 }
 
 .muthur-gm-send {
-  background: #113a1c;
-  color: #33ff5c;
-  border: 1px solid rgba(51, 255, 92, 0.5);
+  background: #3a2200;
+  color: #ff9900;
+  border: 1px solid rgba(255, 153, 0, 0.55);
   cursor: pointer;
   width: 36px;
 }
 .muthur-gm-send:hover {
-  background: #17552a;
+  background: #553300;
 }
 
 .muthur-gm-toolbar {
   display: flex;
   gap: 6px;
   padding: 0 8px 8px 8px;
-  background: #0a0a0a;
+  background: #0a0700;
   flex-wrap: wrap;
 }
 
@@ -195,18 +412,130 @@
   flex: 1;
   min-width: 150px;
   background: #111;
-  color: #cfd8dc;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #ffb84d;
+  border: 1px solid rgba(255, 153, 0, 0.35);
   font-size: 12px;
   padding: 5px 8px;
   cursor: pointer;
 }
 .muthur-gm-toolbar button:hover {
-  background: #1c1c1c;
-  color: #fff;
+  background: #1c1400;
+  color: #ff9900;
+  border-color: rgba(255, 153, 0, 0.55);
 }
 
-.muthur-clear:hover {
+.muthur-gm .muthur-clear:hover {
   border-color: #ff6a4d;
   color: #ff6a4d;
+}
+
+#muthur-terminal-gm .muthur-gm-help-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  font-weight: bold;
+  font-size: 14px;
+  font-family: inherit;
+  line-height: 1;
+  color: #ff9900;
+  background: #000;
+  border: 1px solid rgba(255, 153, 0, 0.55);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+#muthur-terminal-gm .muthur-gm-help-btn:hover {
+  background: #1c1400;
+  border-color: #ff9900;
+}
+
+.muthur-gm-help-panel {
+  position: fixed;
+  z-index: calc(var(--z-index-app, 100) + 1);
+  display: flex;
+  flex-direction: column;
+  background: #000;
+  border: 2px solid #ff9900;
+  color: #ff9900;
+  font-family: "Consolas", "Courier New", ui-monospace, monospace;
+  font-size: 13px;
+  box-shadow: 0 0 24px rgba(255, 153, 0, 0.15);
+}
+
+.muthur-gm-help-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(255, 153, 0, 0.35);
+}
+
+.muthur-gm-help-header strong {
+  font-size: 15px;
+}
+
+.muthur-gm-help-close {
+  background: #000;
+  border: 1px solid #ff9900;
+  color: #ff9900;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.muthur-gm-help-close:hover {
+  background: #1c1400;
+}
+
+.muthur-gm-help-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 12px;
+}
+
+.muthur-gm-help-body hr {
+  border: none;
+  border-top: 1px solid rgba(255, 153, 0, 0.25);
+  margin: 12px 0;
+}
+
+.muthur-gm-help-body h3 {
+  margin: 0 0 6px 0;
+  font-size: 13px;
+  color: #ffb84d;
+}
+
+.muthur-gm-help-text {
+  line-height: 1.45;
+  white-space: normal;
+}
+
+.muthur-spectator-dialog .muthur-spectator-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 200px;
+  overflow-y: auto;
+  margin-top: 8px;
+  padding: 8px;
+  border: 1px solid rgba(255, 153, 0, 0.35);
+}
+
+.muthur-spectator-dialog .muthur-spectator-choice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.muthur-spectator-dialog .muthur-spectator-empty {
+  margin: 0;
+  opacity: 0.85;
 }

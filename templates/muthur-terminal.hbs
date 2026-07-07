@@ -1,14 +1,39 @@
 <div class="muthur-app">
+  {{#if waiting}}
+  <div class="muthur-crt muthur-waiting-screen">
+    <div class="muthur-waiting-content">
+      <h2 class="muthur-waiting-title">{{waitingTitle}}</h2>
+      <p class="muthur-waiting-message">{{waitingMessage}}</p>
+      <p class="muthur-waiting-detail">{{waitingDetail}}</p>
+      <div class="muthur-waiting-dots" aria-hidden="true">.</div>
+    </div>
+  </div>
+  {{else if booting}}
+  <div class="muthur-crt muthur-boot-screen">
+    <div class="muthur-boot-overlay"></div>
+    <div class="muthur-boot-scanline"></div>
+    <div class="muthur-boot-content">
+      <img class="muthur-boot-logo" data-muthur-boot-logo src="modules/muthur-terminal/assets/weyland-yutani-logo.png" alt="{{bootLogoAlt}}" />
+      <div class="muthur-boot-messages" data-muthur-boot-messages></div>
+    </div>
+  </div>
+  {{else}}
   <div class="muthur-crt">
     <div class="muthur-log">
+      {{#if bootSlot}}
+      <div class="muthur-line muthur-type-boot" data-muthur-boot-slot></div>
+      {{/if}}
       {{#each lines}}
       <div class="muthur-line muthur-type-{{this.type}}" data-id="{{this.id}}">{{{this.html}}}</div>
       {{/each}}
     </div>
+    {{#unless readOnly}}
     <div class="muthur-inputrow">
       <span class="muthur-prompt">{{prompt}}</span>
       <input type="text" class="muthur-input" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="{{inputPlaceholder}}" />
       <span class="muthur-cursor">&#9608;</span>
     </div>
+    {{/unless}}
   </div>
+  {{/if}}
 </div>

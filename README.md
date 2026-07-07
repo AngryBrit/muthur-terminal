@@ -15,7 +15,7 @@ Players get a retro green CRT terminal they can type into. The GM gets a compani
 - **Scripted auto-responses** — optional built-in answers for `STATUS`, `TIME`, `DATE`, `CREW`, `MANIFEST`, `LOCATION`, `VERSION`, `INTERFACE`, and `ORDERS` (unknown input still goes to the GM)
 - **GM console** — incoming queries tagged by player, targeted or broadcast replies, system alerts
 - **Live sync** — transcript stored in a world setting and pushed to every connected client
-- **Atmosphere** — character-by-character typewriter replies and retro terminal sound effects
+- **Atmosphere** — scramble-decode typewriter, CRT scanline sweeps, animated boot text, character-by-character replies, and retro terminal sound effects
 - **Localization** — English, French, German, Spanish, and Italian (follows Foundry core language)
 - **Scene controls** — terminal icon for all users; satellite-dish GM console icon for the GM
 - **API** — `game.muthur.open()`, `openGM()`, `forceOpenAll()`, `clearTranscript()`
@@ -96,6 +96,10 @@ In **Module Settings → Alien RPG - MU/TH/UR Terminal**:
 | STATUS Command Preset | World | Preset response when a player types `STATUS` |
 | Custom STATUS Text | World | Custom `STATUS` body when preset is **Custom Text** |
 | Typing Speed | Client | ms per character for MU/TH/UR reply typewriter |
+| Typewriter Effect | Client | Animate boot text and replies; disable for instant display |
+| Scramble Decode Effect | Client | Random character flicker before each letter locks in |
+| Scanline Sweep | Client | CRT glow sweep across each line before text appears |
+| Scanline Size | Client | Width of the scanline glow in pixels |
 | Terminal Sounds | Client | Enable/disable retro sound effects |
 | Terminal Sound Volume | Client | Volume for sound effects (0.0–1.0) |
 

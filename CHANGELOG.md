@@ -5,6 +5,20 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- When a player opens the terminal, they always see a waiting screen until the GM approves the session and selects spectators; reopening the terminal repeats the authorization flow.
+- Full CRT boot screen in the player terminal: Weyland-Yutani logo graphic, animated startup lines, scanline effects, and power-down transition; configurable boot text still types into the terminal log afterward.
+- GM console help panel (`?` in the window header) listing player commands and GM console actions.
+- CRT text rendering ported from alien-mu-th-ur: scramble decode typewriter, per-line scanline sweep, animated boot text, and client settings to toggle each effect.
+- Fixed boot animation being skipped when ApplicationV2 re-rendered before the typewriter finished.
+- Restored localized defaults in module settings UI for Boot Text, Terminal Prompt, and Custom STATUS Text.
+- Fixed multiline boot, STATUS, and reply text rendering (line breaks in terminal and textarea settings).
+- Module settings for Boot Text and Custom STATUS Text now use proper textarea controls with newline-preserving defaults.
+- Settings UI hook converts Boot Text and Custom STATUS fields to textareas when Foundry renders single-line inputs.
+
 ## [1.1.6] - 2026-07-07
 
 ### Fixed
