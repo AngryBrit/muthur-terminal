@@ -7,26 +7,26 @@
     </div>
   </div>
   <div class="muthur-gm-controls">
-    <select class="muthur-target" title="Who should see this reply">
-      <option value="all">ALL TERMINALS</option>
+    <select class="muthur-target" title="{{targetTitle}}">
+      <option value="all">{{allTerminals}}</option>
       {{#each users}}
-      <option value="{{this.id}}">{{this.name}}{{#unless this.active}} (offline){{/unless}}</option>
+      <option value="{{this.id}}">{{this.name}}{{#unless this.active}} {{../offlineLabel}}{{/unless}}</option>
       {{/each}}
     </select>
-    <input type="text" class="muthur-gm-input" placeholder="Type MU/TH/UR's response and press Enter..." autocomplete="off" spellcheck="false" />
-    <button type="button" class="muthur-gm-send" title="Send">
+    <input type="text" class="muthur-gm-input" placeholder="{{inputPlaceholder}}" autocomplete="off" spellcheck="false" />
+    <button type="button" class="muthur-gm-send" title="{{sendTitle}}">
       <i class="fa-solid fa-paper-plane"></i>
     </button>
   </div>
   <div class="muthur-gm-toolbar">
     <button type="button" class="muthur-force-open">
-      <i class="fa-solid fa-desktop"></i> Force-Open All Terminals
+      <i class="fa-solid fa-desktop"></i> {{forceOpenLabel}}
     </button>
     <button type="button" class="muthur-system-msg">
-      <i class="fa-solid fa-triangle-exclamation"></i> Send System Alert
+      <i class="fa-solid fa-triangle-exclamation"></i> {{systemAlertLabel}}
     </button>
     <button type="button" class="muthur-clear">
-      <i class="fa-solid fa-trash"></i> Clear Transcript
+      <i class="fa-solid fa-trash"></i> {{clearLabel}}
     </button>
   </div>
 </div>

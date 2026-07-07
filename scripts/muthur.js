@@ -63,9 +63,9 @@ function formatEntryHtml(entry, { showAuthor = false } = {}) {
     const who = showAuthor && entry.authorName ? `<span class="muthur-author">[${escapeHtml(entry.authorName)}]</span> ` : "";
     prefix = `<span class="muthur-caret">&gt;</span> ${who}`;
   } else if (entry.type === "output") {
-    prefix = `<span class="muthur-tag">MU/TH/UR:</span> `;
+    prefix = `<span class="muthur-tag">${escapeHtml(localize("MUTHUR.TagMuthur"))}</span> `;
   } else if (entry.type === "system") {
-    prefix = `<span class="muthur-tag muthur-sys">SYSTEM:</span> `;
+    prefix = `<span class="muthur-tag muthur-sys">${escapeHtml(localize("MUTHUR.TagSystem"))}</span> `;
   }
   const body = escapeHtml(entry.text ?? "").replace(/\n/g, "<br>");
   return prefix + body;
@@ -303,6 +303,7 @@ class MuthurPlayerApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
   constructor(options = {}) {
     super(options);
+    this.options.window.title = localize("MUTHUR.WindowPlayerTitle");
     this.commandHistory = [];
     this.historyIndex = -1;
     this.localPending = [];
@@ -359,7 +360,8 @@ class MuthurPlayerApp extends HandlebarsApplicationMixin(ApplicationV2) {
     this._lines = lines;
     return {
       lines,
-      prompt: game.settings.get(MODULE_ID, "prompt") || "INTERFACE 2037>"
+      prompt: game.settings.get(MODULE_ID, "prompt") || localize("MUTHUR.DefaultPrompt"),
+      inputPlaceholder: localize("MUTHUR.InputPlaceholder")
     };
   }
 
@@ -391,7 +393,7 @@ class MuthurPlayerApp extends HandlebarsApplicationMixin(ApplicationV2) {
       const el = this.element.querySelector(`.muthur-line[data-id="${CSS.escape(String(line.id))}"]`);
       if (!el) continue;
       this._animatedIds.add(line.id);
-      el.innerHTML = `<span class="muthur-tag">MU/TH/UR:</span> `;
+      el.innerHTML = `<span class="muthur-tag">${escapeHtml(localize("MUTHUR.TagMuthur"))}</span> `;
       this._typewrite(el, line.text ?? "", speed);
     }
   }
@@ -540,6 +542,11 @@ class MuthurGMApp extends HandlebarsApplicationMixin(ApplicationV2) {
     body: { template: `modules/${MODULE_ID}/templates/muthur-gm.hbs` }
   };
 
+  constructor(options = {}) {
+    super(options);
+    this.options.window.title = localize("MUTHUR.WindowGMTitle");
+  }
+
   static open() {
     if (!game.user.isGM) return null;
     if (this.current) {
@@ -561,7 +568,18 @@ class MuthurGMApp extends HandlebarsApplicationMixin(ApplicationV2) {
     const users = game.users
       .filter((u) => !u.isGM)
       .map((u) => ({ id: u.id, name: u.name, active: u.active }));
-    return { lines, users };
+    return {
+      lines,
+      users,
+      targetTitle: localize("MUTHUR.GM.TargetTitle"),
+      allTerminals: localize("MUTHUR.GM.AllTerminals"),
+      offlineLabel: localize("MUTHUR.GM.Offline"),
+      inputPlaceholder: localize("MUTHUR.GM.InputPlaceholder"),
+      sendTitle: localize("MUTHUR.GM.Send"),
+      forceOpenLabel: localize("MUTHUR.GM.ForceOpen"),
+      systemAlertLabel: localize("MUTHUR.GM.SystemAlert"),
+      clearLabel: localize("MUTHUR.GM.ClearTranscript")
+    };
   }
 
   _onRender(_context, _options) {
@@ -583,7 +601,7 @@ class MuthurGMApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     this.element.querySelector(".muthur-force-open")?.addEventListener("click", () => {
       game.socket.emit(SOCKET, { action: "force-open" });
-      ui.notifications.info("Forced open MU/TH/UR terminals on all connected clients.");
+      ui.notifications.info(localize("MUTHUR.GM.ForceOpenNotify"));
     });
 
     this.element.querySelector(".muthur-system-msg")?.addEventListener("click", () => {
@@ -592,8 +610,8 @@ class MuthurGMApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     this.element.querySelector(".muthur-clear")?.addEventListener("click", () => {
       Dialog.confirm({
-        title: "Clear MU/TH/UR Transcript",
-        content: "<p>This will erase the terminal transcript for everyone. Continue?</p>",
+        title: localize("MUTHUR.GM.ClearTitle"),
+        content: `<p>${escapeHtml(localize("MUTHUR.GM.ClearContent"))}</p>`,
         yes: () => clearTranscript(),
         defaultYes: false
       });
@@ -621,13 +639,13 @@ class MuthurGMApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
   async _promptSystemMessage() {
     new Dialog({
-      title: "Send System Alert",
-      content: `<form><div class="form-group"><label>Message</label>
-        <input type="text" name="msg" style="width:100%" placeholder="e.g. WARNING: HULL BREACH DETECTED"/></div></form>`,
+      title: localize("MUTHUR.GM.SystemAlertTitle"),
+      content: `<form><div class="form-group"><label>${escapeHtml(localize("MUTHUR.GM.SystemAlertLabel"))}</label>
+        <input type="text" name="msg" style="width:100%" placeholder="${escapeHtml(localize("MUTHUR.GM.SystemAlertPlaceholder"))}"/></div></form>`,
       buttons: {
         send: {
           icon: '<i class="fa-solid fa-paper-plane"></i>',
-          label: "Send",
+          label: localize("MUTHUR.GM.Send"),
           callback: async (html) => {
             const text = html.find('[name="msg"]').val()?.trim();
             if (!text) return;
@@ -722,8 +740,7 @@ Hooks.once("init", () => {
     scope: "world",
     config: true,
     type: String,
-    default:
-      "MU/TH/UR 6000 - INTERFACE 2037 v2.20\nWEYLAND-YUTANI CORP. ALL RIGHTS RESERVED.\nTYPE 'HELP' FOR AVAILABLE COMMANDS."
+    default: game.i18n.localize("MUTHUR.SettingBootTextDefault")
   });
 
   game.settings.register(MODULE_ID, "prompt", {
@@ -732,7 +749,7 @@ Hooks.once("init", () => {
     scope: "world",
     config: true,
     type: String,
-    default: "INTERFACE 2037>"
+    default: game.i18n.localize("MUTHUR.DefaultPrompt")
   });
 
   game.settings.register(MODULE_ID, "typeSpeed", {
@@ -798,7 +815,7 @@ Hooks.once("init", () => {
     scope: "world",
     config: true,
     type: String,
-    default: "MU/TH/UR 6000\nALL SYSTEMS NOMINAL\nNO ANOMALIES DETECTED"
+    default: game.i18n.localize("MUTHUR.SettingStatusCustomDefault")
   });
 
   game.muthur = {
