@@ -71,6 +71,88 @@ function formatEntryHtml(entry, { showAuthor = false } = {}) {
   return prefix + body;
 }
 
+function localize(key, data = {}) {
+  return game.i18n.format(key, data);
+}
+
+function normalizeCommand(text) {
+  return String(text ?? "").trim().toUpperCase().replace(/\s+/g, " ");
+}
+
+function getStatusResponseText() {
+  const preset = game.settings.get(MODULE_ID, "statusPreset") ?? "normal";
+  if (preset === "custom") {
+    const custom = game.settings.get(MODULE_ID, "statusCustomText")?.trim();
+    return custom || localize("MUTHUR.Commands.status.presets.normal");
+  }
+  return localize(`MUTHUR.Commands.status.presets.${preset}`);
+}
+
+function getMissionTimeText() {
+  const components = game.time?.components ?? {};
+  const hour = String(components.hour ?? 0).padStart(2, "0");
+  const minute = String(components.minute ?? 0).padStart(2, "0");
+  const second = String(components.second ?? 0).padStart(2, "0");
+  const day = components.day ?? 1;
+  const month = components.month ?? 1;
+  const year = components.year ?? 2183;
+  return localize("MUTHUR.Commands.time", { hour, minute, second, day, month, year });
+}
+
+function getCrewManifestText() {
+  const crew = game.users
+    .filter((u) => !u.isGM)
+    .map((u) => {
+      const designation = (u.character?.name ?? u.name).toUpperCase();
+      const status = u.active ? localize("MUTHUR.Commands.crewActive") : localize("MUTHUR.Commands.crewInactive");
+      return localize("MUTHUR.Commands.crewLine", { designation, status });
+    });
+  if (!crew.length) return localize("MUTHUR.Commands.crewEmpty");
+  return `${localize("MUTHUR.Commands.crewHeader")}\n${crew.join("\n")}`;
+}
+
+function getSceneLocationText() {
+  const scene = game.scenes?.current;
+  if (!scene) return localize("MUTHUR.Commands.locationUnknown");
+  return localize("MUTHUR.Commands.location", { scene: scene.name.toUpperCase() });
+}
+
+function getVersionText() {
+  const manifest = game.modules.get(MODULE_ID)?.version ?? "unknown";
+  return localize("MUTHUR.Commands.version", { version: manifest });
+}
+
+function getSpecialOrdersText() {
+  return localize("MUTHUR.Commands.specialOrders");
+}
+
+/**
+ * Built-in MU/TH/UR command handlers. Return null to fall through to the GM.
+ * @param {string} text Raw player input
+ * @returns {{ text: string, type?: string } | null}
+ */
+function resolveScriptedCommand(text) {
+  const cmd = normalizeCommand(text);
+  const handlers = {
+    STATUS: () => ({ text: getStatusResponseText(), type: "output" }),
+    TIME: () => ({ text: getMissionTimeText(), type: "output" }),
+    DATE: () => ({ text: getMissionTimeText(), type: "output" }),
+    CREW: () => ({ text: getCrewManifestText(), type: "output" }),
+    "CREW MANIFEST": () => ({ text: getCrewManifestText(), type: "output" }),
+    MANIFEST: () => ({ text: getCrewManifestText(), type: "output" }),
+    LOCATION: () => ({ text: getSceneLocationText(), type: "output" }),
+    LOC: () => ({ text: getSceneLocationText(), type: "output" }),
+    VERSION: () => ({ text: getVersionText(), type: "output" }),
+    INTERFACE: () => ({ text: getVersionText(), type: "output" }),
+    ORDERS: () => ({ text: getSpecialOrdersText(), type: "output" }),
+    "SPECIAL ORDERS": () => ({ text: getSpecialOrdersText(), type: "output" }),
+    "SPECIAL ORDER": () => ({ text: getSpecialOrdersText(), type: "output" })
+  };
+
+  const handler = handlers[cmd];
+  return handler ? handler() : null;
+}
+
 /* -------------------------------------------- */
 /*  Terminal sounds (ported from alien-mu-th-ur) */
 /* -------------------------------------------- */
@@ -394,7 +476,7 @@ class MuthurPlayerApp extends HandlebarsApplicationMixin(ApplicationV2) {
       this.localPending.push({
         id,
         type: "system",
-        text: "Local commands: HELP, CLEAR. Anything else is relayed to MU/TH/UR for a response.",
+        text: localize("MUTHUR.Commands.help"),
         timestamp: Date.now(),
         local: true
       });
@@ -583,7 +665,7 @@ class MuthurGMApp extends HandlebarsApplicationMixin(ApplicationV2) {
 /*  Socket handling                              */
 /* -------------------------------------------- */
 
-function onSocketEvent(data) {
+async function onSocketEvent(data) {
   if (!data?.action) return;
 
   if (data.action === "force-open") {
@@ -592,9 +674,9 @@ function onSocketEvent(data) {
   }
 
   if (data.action === "command") {
-    // Only the GM persists incoming queries into the shared transcript.
     if (!game.user.isGM) return;
-    pushTranscriptEntry({
+
+    await pushTranscriptEntry({
       id: foundry.utils.randomID(),
       tempId: data.tempId,
       type: "input",
@@ -603,6 +685,21 @@ function onSocketEvent(data) {
       authorName: data.userName,
       scope: [data.userId],
       timestamp: Date.now()
+    });
+
+    if (!game.settings.get(MODULE_ID, "enableScriptedResponses")) return;
+
+    const response = resolveScriptedCommand(data.text);
+    if (!response) return;
+
+    await pushTranscriptEntry({
+      id: foundry.utils.randomID(),
+      type: response.type ?? "output",
+      text: response.text,
+      authorId: "muthur",
+      scope: [data.userId],
+      timestamp: Date.now(),
+      scripted: true
     });
   }
 }
@@ -664,6 +761,44 @@ Hooks.once("init", () => {
     type: Number,
     range: { min: 0, max: 1, step: 0.1 },
     default: 0.2
+  });
+
+  game.settings.register(MODULE_ID, "enableScriptedResponses", {
+    name: "MUTHUR.SettingScriptedResponsesName",
+    hint: "MUTHUR.SettingScriptedResponsesHint",
+    scope: "world",
+    config: true,
+    type: Boolean,
+    default: true
+  });
+
+  game.settings.register(MODULE_ID, "statusPreset", {
+    name: "MUTHUR.SettingStatusPresetName",
+    hint: "MUTHUR.SettingStatusPresetHint",
+    scope: "world",
+    config: true,
+    type: String,
+    choices: {
+      normal: "MUTHUR.SettingStatusPreset.normal",
+      anomalyDetected: "MUTHUR.SettingStatusPreset.anomalyDetected",
+      degradedPerformance: "MUTHUR.SettingStatusPreset.degradedPerformance",
+      fireDetected: "MUTHUR.SettingStatusPreset.fireDetected",
+      quarantine: "MUTHUR.SettingStatusPreset.quarantine",
+      lockdown: "MUTHUR.SettingStatusPreset.lockdown",
+      intrusion: "MUTHUR.SettingStatusPreset.intrusion",
+      networkIssue: "MUTHUR.SettingStatusPreset.networkIssue",
+      custom: "MUTHUR.SettingStatusPreset.custom"
+    },
+    default: "normal"
+  });
+
+  game.settings.register(MODULE_ID, "statusCustomText", {
+    name: "MUTHUR.SettingStatusCustomName",
+    hint: "MUTHUR.SettingStatusCustomHint",
+    scope: "world",
+    config: true,
+    type: String,
+    default: "MU/TH/UR 6000\nALL SYSTEMS NOMINAL\nNO ANOMALIES DETECTED"
   });
 
   game.muthur = {
