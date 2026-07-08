@@ -19,9 +19,8 @@
     "scripts/muthur.js"
   ],
   "styles": [
-    {
-      "src": "styles/muthur.css"
-    }
+    "styles/muthur.css",
+    "styles/muthur-cerberus.css"
   ],
   "languages": [
     {

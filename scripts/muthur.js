@@ -29,6 +29,7 @@ const activeSession = {
 let spectatorWatchUserId = null;
 
 let pendingSpectatorRequestId = null;
+let pendingCerberusRequestId = null;
 
 /* -------------------------------------------- */
 /*  Helpers                                      */
@@ -322,7 +323,7 @@ async function animateTerminalText(lineEl, { text, type, speed, scrollFn, isActi
   const color = type === "boot" ? "#1fae40" : "#33ff5c";
   const scramble = isScrambleEnabled();
   const playReply = type === "output" || type === "boot";
-  const soundMode = type === "boot" ? "none" : "com";
+  const soundMode = playReply ? "none" : "com";
 
   lineEl.innerHTML = "";
   if (type === "output") {
@@ -410,12 +411,62 @@ function getSpecialOrdersText() {
   return localize("MUTHUR.Commands.specialOrders");
 }
 
+const SPECIAL_ORDER_CODES = new Set(["754", "899", "931", "937", "939", "966"]);
+
+function extractSpecialOrderKey(command) {
+  return String(command ?? "")
+    .replace(/^ORDER\s+SPECIAL\s+/i, "")
+    .replace(/^SPECIAL\s+ORDER\s+/i, "")
+    .replace(/^SPECIAL\s+ORDERS\s+/i, "")
+    .replace(/^ORDRE\s+SPECIAL\s+/i, "")
+    .replace(/^ORDRE\s+SPÉCIAL\s+/i, "")
+    .replace(/^SPECIAL\s+ORDRE\s+/i, "")
+    .replace(/^SPÉCIAL\s+ORDRE\s+/i, "")
+    .replace(/^ORDER\s+/i, "")
+    .replace(/^ORDRE\s+/i, "")
+    .replace(/^SPECIAL\s+/i, "")
+    .replace(/^SPÉCIAL\s+/i, "")
+    .replace(/^PROTOCOLE\s+/i, "")
+    .replace(/^PROTOCOL\s+/i, "")
+    .trim();
+}
+
+function getSpecialOrderResponse(text) {
+  const orderKey = extractSpecialOrderKey(normalizeCommand(text));
+  if (!SPECIAL_ORDER_CODES.has(orderKey)) return null;
+  const name = localize(`MUTHUR.Commands.specialOrder.${orderKey}.name`);
+  const description = localize(`MUTHUR.Commands.specialOrder.${orderKey}.description`);
+  if (name.startsWith("MUTHUR.") || description.startsWith("MUTHUR.")) return null;
+  return `${name}\n${description}`;
+}
+
+function isCerberusCommand(text) {
+  const key = extractSpecialOrderKey(normalizeCommand(text));
+  if (key === "CERBERUS") return true;
+  return normalizeCommand(text).split(/\s+/).includes("CERBERUS");
+}
+
+function isCerberusAllowed() {
+  try {
+    return game.settings.get(MODULE_ID, "allowCerberus");
+  } catch {
+    return true;
+  }
+}
+
+function clampCerberusMinutes(minutes) {
+  return Math.max(1, Math.min(60, Number.parseInt(minutes, 10) || 10));
+}
+
 /**
  * Built-in MU/TH/UR command handlers. Return null to fall through to the GM.
  * @param {string} text Raw player input
  * @returns {{ text: string, type?: string } | null}
  */
 function resolveScriptedCommand(text) {
+  const orderResponse = getSpecialOrderResponse(text);
+  if (orderResponse) return { text: orderResponse, type: "output" };
+
   const cmd = normalizeCommand(text);
   const handlers = {
     STATUS: () => ({ text: getStatusResponseText(), type: "output" }),
@@ -561,6 +612,487 @@ const MuthurSounds = {
 };
 
 /* -------------------------------------------- */
+/*  Cerberus self-destruct protocol              */
+/* -------------------------------------------- */
+
+function getCerberusContext() {
+  if (!CerberusProtocol.isRunning) return {};
+  return {
+    cerberusActive: true,
+    cerberusTitle: localize("MUTHUR.Cerberus.Activated"),
+    cerberusTime: CerberusProtocol.displayTime || `${CerberusProtocol.durationMinutes}:00`,
+    cerberusShowStop: game.user.isGM,
+    cerberusStopLabel: localize("MUTHUR.Cerberus.Stop")
+  };
+}
+
+function refreshCerberusTerminalViews() {
+  MuthurPlayerApp.current?.render({ force: true });
+  if (game.user.isGM) MuthurGMApp.current?.render({ force: true });
+}
+
+function bindCerberusInlineStop(root) {
+  root?.querySelector(".muthur-cerberus-inline-stop")?.addEventListener("click", () => {
+    emitCerberusStop();
+  });
+}
+
+function ensureCerberusStyles() {
+  if (document.getElementById("muthur-cerberus-styles")) return;
+  const link = document.createElement("link");
+  link.id = "muthur-cerberus-styles";
+  link.rel = "stylesheet";
+  link.type = "text/css";
+  link.href = `modules/${MODULE_ID}/styles/muthur-cerberus.css`;
+  document.head.appendChild(link);
+}
+
+const CerberusProtocol = {
+  countdownInterval: null,
+  durationMinutes: 10,
+  initiatorId: null,
+  isRunning: false,
+  displayTime: "",
+
+  _countSound(n) {
+    return `modules/${MODULE_ID}/sounds/count/${n}.ogg`;
+  },
+
+  _countAsset(name) {
+    return `modules/${MODULE_ID}/sounds/count/${name}.ogg`;
+  },
+
+  _playCountSound(src) {
+    if (!MuthurSounds.isEnabled()) return;
+    const volume = MuthurSounds.volume();
+    try {
+      if (typeof AudioHelper !== "undefined" && AudioHelper?.play) {
+        void AudioHelper.play({ src, volume, autoplay: true, loop: false }, true);
+        return;
+      }
+    } catch {
+      /* fall through */
+    }
+    const audio = new Audio(src);
+    audio.volume = volume;
+    void audio.play();
+  },
+
+  removeAll() {
+    if (this.countdownInterval) {
+      clearInterval(this.countdownInterval);
+      this.countdownInterval = null;
+    }
+    document.getElementById("muthur-cerberus-window")?.remove();
+    document.getElementById("muthur-cerberus-death")?.remove();
+    document.querySelectorAll(".muthur-cerberus-inline").forEach((el) => el.remove());
+    MuthurPlayerApp.current?.element?.querySelector(".muthur-cerberus-confirm")?.remove();
+    this.isRunning = false;
+    this.displayTime = "";
+  },
+
+  _updateCountdownDisplay(text) {
+    this.displayTime = text;
+    const el = document.getElementById("muthur-cerberus-countdown");
+    if (el) el.textContent = text;
+    document.querySelectorAll("[data-muthur-cerberus-countdown]").forEach((node) => {
+      node.textContent = text;
+    });
+  },
+
+  _mountOverlay() {
+    return document.body;
+  },
+
+  createWindow(minutes) {
+    ensureCerberusStyles();
+    this.removeAll();
+    this.durationMinutes = clampCerberusMinutes(minutes);
+    this._playCountSound(this._countAsset("Cerberuslunch"));
+    this.isRunning = true;
+    this.displayTime = `${this.durationMinutes}:00`;
+
+    const win = document.createElement("div");
+    win.id = "muthur-cerberus-window";
+    win.className = "muthur-cerberus-window";
+    Object.assign(win.style, {
+      position: "fixed",
+      top: "64px",
+      left: "50%",
+      right: "auto",
+      transform: "translateX(-50%)",
+      width: "min(380px, calc(100vw - 48px))",
+      zIndex: "10000000",
+      pointerEvents: "auto",
+      cursor: "move",
+      userSelect: "none"
+    });
+    win.innerHTML = `
+      <div class="muthur-cerberus-panel">
+        <div class="muthur-cerberus-title">⚠ ${escapeHtml(localize("MUTHUR.Cerberus.Activated"))} ⚠</div>
+        <div class="muthur-cerberus-status">
+          ${escapeHtml(localize("MUTHUR.Cerberus.Status"))}:
+          <span class="muthur-cerberus-critical">${escapeHtml(localize("MUTHUR.Cerberus.Critical"))}</span>
+        </div>
+        <div class="muthur-cerberus-text">${escapeHtml(localize("MUTHUR.Cerberus.Warning"))}</div>
+        <div id="muthur-cerberus-countdown" class="muthur-cerberus-countdown">${this.durationMinutes}:00</div>
+        <div class="muthur-cerberus-status">
+          ${escapeHtml(localize("MUTHUR.Cerberus.FinalWarning"))}<br>
+          ${escapeHtml(localize("MUTHUR.Cerberus.NoReturn"))}
+        </div>
+        <div class="muthur-cerberus-text">${escapeHtml(localize("MUTHUR.Cerberus.Evacuate"))}</div>
+        ${game.user.isGM ? `<div class="muthur-cerberus-actions"><button type="button" class="muthur-cerberus-stop">${escapeHtml(localize("MUTHUR.Cerberus.Stop"))}</button></div>` : ""}
+      </div>
+    `;
+
+    this._mountOverlay().appendChild(win);
+
+    const panel = win.querySelector(".muthur-cerberus-panel");
+    if (panel) {
+      Object.assign(panel.style, {
+        background: "rgba(0, 0, 0, 0.95)",
+        border: "2px solid #ff0000",
+        boxShadow: "0 0 15px #ff0000, inset 0 0 8px #ff0000",
+        padding: "15px",
+        fontFamily: "Consolas, Courier New, monospace",
+        color: "#ff0000"
+      });
+    }
+    win.querySelectorAll(".muthur-cerberus-title, .muthur-cerberus-text, .muthur-cerberus-status").forEach((el) => {
+      Object.assign(el.style, { textAlign: "center", fontWeight: "bold" });
+    });
+    const countdown = win.querySelector(".muthur-cerberus-countdown");
+    if (countdown) {
+      Object.assign(countdown.style, {
+        fontSize: "30px",
+        textAlign: "center",
+        fontWeight: "bold",
+        padding: "5px",
+        border: "1px solid #ff0000",
+        borderRadius: "3px",
+        margin: "12px 0"
+      });
+    }
+
+    const stopBtn = win.querySelector(".muthur-cerberus-stop");
+    if (stopBtn) {
+      Object.assign(stopBtn.style, {
+        background: "#ff0000",
+        color: "#fff",
+        border: "1px solid #ff3333",
+        padding: "5px 15px",
+        cursor: "pointer",
+        fontFamily: "Consolas, Courier New, monospace",
+        textTransform: "uppercase",
+        fontWeight: "bold"
+      });
+    }
+
+    stopBtn?.addEventListener("click", () => {
+      emitCerberusStop();
+    });
+
+    let dragging = false;
+    let sx = 0;
+    let sy = 0;
+    let ox = 0;
+    let oy = 0;
+    const onMove = (e) => {
+      if (!dragging) return;
+      const cx = e.touches ? e.touches[0].clientX : e.clientX;
+      const cy = e.touches ? e.touches[0].clientY : e.clientY;
+      win.style.left = `${Math.max(0, Math.min(window.innerWidth - win.offsetWidth, sx + (cx - ox)))}px`;
+      win.style.top = `${Math.max(0, Math.min(window.innerHeight - win.offsetHeight, sy + (cy - oy)))}px`;
+      win.style.right = "auto";
+    };
+    const onEnd = () => {
+      dragging = false;
+    };
+    win.addEventListener("mousedown", (e) => {
+      if (e.button !== 0 || e.target.closest("button")) return;
+      dragging = true;
+      const rect = win.getBoundingClientRect();
+      sx = rect.left;
+      sy = rect.top;
+      ox = e.clientX;
+      oy = e.clientY;
+      win.style.transform = "none";
+      win.style.left = `${sx}px`;
+      e.preventDefault();
+    });
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onEnd);
+    win.addEventListener("touchstart", (e) => {
+      if (e.target.closest("button")) return;
+      dragging = true;
+      const rect = win.getBoundingClientRect();
+      sx = rect.left;
+      sy = rect.top;
+      ox = e.touches[0].clientX;
+      oy = e.touches[0].clientY;
+      win.style.transform = "none";
+      win.style.left = `${sx}px`;
+      e.preventDefault();
+    }, { passive: false });
+    window.addEventListener("touchmove", onMove, { passive: false });
+    window.addEventListener("touchend", onEnd);
+  },
+
+  startCountdown(minutes) {
+    const duration = clampCerberusMinutes(minutes);
+    this.durationMinutes = duration;
+    let timeLeft = duration * 60;
+
+    if (this.countdownInterval) clearInterval(this.countdownInterval);
+
+    const updateDisplay = () => {
+      const mins = Math.floor(timeLeft / 60);
+      const secs = timeLeft % 60;
+      this._updateCountdownDisplay(`${mins}:${String(secs).padStart(2, "0")}`);
+    };
+
+    updateDisplay();
+
+    this.countdownInterval = setInterval(() => {
+      timeLeft--;
+      updateDisplay();
+
+      if (timeLeft <= 10 && timeLeft > 0) {
+        this._playCountSound(this._countSound(timeLeft));
+      }
+
+      if (timeLeft > 0 && timeLeft % 30 === 0 && game.user.isGM) {
+        MuthurSounds.playErrorSound();
+        const mins = Math.floor(timeLeft / 60);
+        const secs = timeLeft % 60;
+        const time =
+          mins > 0
+            ? localize("MUTHUR.Cerberus.TimeMinutesSeconds", {
+                minutes: mins,
+                seconds: String(secs).padStart(2, "0")
+              })
+            : localize("MUTHUR.Cerberus.TimeSecondsOnly", {
+                seconds: String(secs).padStart(2, "0")
+              });
+        void ChatMessage.create({
+          content: `<span style="color:#ff0000;font-weight:bold;">${escapeHtml(localize("MUTHUR.Cerberus.TimeRemaining", { time }))}</span>`,
+          type: CONST.CHAT_MESSAGE_TYPES.EMOTE,
+          speaker: { alias: "MU/TH/UR 6000" }
+        });
+      }
+
+      if (timeLeft <= 0) {
+        clearInterval(this.countdownInterval);
+        this.countdownInterval = null;
+        this.removeAll();
+        void this.playEndSequence();
+      }
+    }, 1000);
+  },
+
+  async playEndSequence() {
+    try {
+      if (MuthurSounds.isEnabled()) {
+        const byebye = new Audio(this._countAsset("Weythanks"));
+        byebye.volume = MuthurSounds.volume();
+        await byebye.play();
+        await new Promise((resolve) => {
+          byebye.onended = resolve;
+        });
+        const boom = new Audio(this._countAsset("boom"));
+        boom.volume = MuthurSounds.volume();
+        await boom.play();
+      }
+
+      this.createDeathScreen();
+
+      if (MuthurSounds.isEnabled()) {
+        const deathMusic = new Audio(this._countAsset("musicmort"));
+        deathMusic.volume = MuthurSounds.volume();
+        await deathMusic.play();
+        deathMusic.addEventListener("ended", () => {
+          document.getElementById("muthur-cerberus-death")?.remove();
+        });
+      }
+
+      activeSession.userId = null;
+      activeSession.userName = null;
+      activeSession.spectatorIds = [];
+      MuthurPlayerApp.current?.close({ animate: false });
+      if (game.user.isGM) MuthurGMApp.current?.close({ animate: false });
+    } catch (err) {
+      console.error(`${MODULE_ID} | Cerberus end sequence error`, err);
+    }
+  },
+
+  createDeathScreen() {
+    document.getElementById("muthur-cerberus-death")?.remove();
+    const screen = document.createElement("div");
+    screen.id = "muthur-cerberus-death";
+    screen.className = "muthur-cerberus-death";
+    screen.innerHTML = `
+      <div class="muthur-cerberus-death-title">${escapeHtml(localize("MUTHUR.Cerberus.YouAreDead"))}</div>
+      <div class="muthur-cerberus-death-subtitle">${escapeHtml(localize("MUTHUR.Cerberus.MissionFailed"))}</div>
+    `;
+    document.body.appendChild(screen);
+  },
+
+  begin(data) {
+    const minutes = clampCerberusMinutes(data.minutes);
+    this.initiatorId = data.userId ?? null;
+    this.isRunning = true;
+    this.createWindow(minutes);
+    this.startCountdown(minutes);
+    refreshCerberusTerminalViews();
+  },
+
+  stop() {
+    this.removeAll();
+    refreshCerberusTerminalViews();
+    if (game.user.isGM) {
+      void ChatMessage.create({
+        content: `<span style="color:#ff0000;">${escapeHtml(localize("MUTHUR.Cerberus.Stopped"))}</span>`,
+        type: CONST.CHAT_MESSAGE_TYPES.EMOTE,
+        speaker: { alias: "MU/TH/UR 6000" }
+      });
+    }
+  }
+};
+
+function emitCerberusStart(userId, userName, minutes) {
+  const payload = {
+    action: "cerberus-start",
+    userId,
+    userName,
+    minutes: clampCerberusMinutes(minutes)
+  };
+  game.socket.emit(SOCKET, payload);
+  // Foundry sockets do not echo to the sender — start locally too.
+  void handleCerberusStart(payload);
+}
+
+function emitCerberusStop() {
+  game.socket.emit(SOCKET, { action: "cerberus-stop" });
+  CerberusProtocol.stop();
+}
+
+function showCerberusApprovalDialog(userId, userName, tempId) {
+  if (!game.user.isGM) return;
+  if (pendingCerberusRequestId === userId) return;
+  pendingCerberusRequestId = userId;
+
+  let resolved = false;
+  const finish = () => {
+    if (resolved) return;
+    resolved = true;
+    pendingCerberusRequestId = null;
+  };
+
+  new Dialog(
+    {
+      title: localize("MUTHUR.Cerberus.GMApprovalTitle"),
+      content: `<p>${escapeHtml(localize("MUTHUR.Cerberus.GMApprovalContent", { name: userName }))}</p>
+        <div class="form-group">
+          <label>${escapeHtml(localize("MUTHUR.Cerberus.MinutesLabel"))}</label>
+          <input type="number" name="minutes" min="1" max="60" value="10" />
+        </div>`,
+      buttons: {
+        approve: {
+          icon: '<i class="fas fa-radiation"></i>',
+          label: localize("MUTHUR.Cerberus.Approve"),
+          callback: (html) => {
+            const minutes = clampCerberusMinutes(html.find('[name="minutes"]').val());
+            game.socket.emit(SOCKET, {
+              action: "cerberus-approval",
+              approved: true,
+              targetUserId: userId,
+              minutes,
+              tempId
+            });
+            finish();
+          }
+        },
+        deny: {
+          icon: '<i class="fas fa-times"></i>',
+          label: localize("MUTHUR.Cerberus.Deny"),
+          callback: () => {
+            game.socket.emit(SOCKET, {
+              action: "cerberus-approval",
+              approved: false,
+              targetUserId: userId,
+              tempId
+            });
+            finish();
+          }
+        }
+      },
+      default: "approve",
+      close: finish
+    },
+    { classes: ["muthur-cerberus-dialog"], width: 360 }
+  ).render(true);
+}
+
+function showCerberusGMDirectDialog(userId, userName) {
+  new Dialog(
+    {
+      title: localize("MUTHUR.Cerberus.GMApprovalTitle"),
+      content: `<div class="form-group">
+          <label>${escapeHtml(localize("MUTHUR.Cerberus.MinutesLabel"))}</label>
+          <input type="number" name="minutes" min="1" max="60" value="10" />
+        </div>`,
+      buttons: {
+        initiate: {
+          icon: '<i class="fas fa-radiation"></i>',
+          label: localize("MUTHUR.Cerberus.Confirm"),
+          callback: (html) => {
+            const minutes = clampCerberusMinutes(html.find('[name="minutes"]').val());
+            emitCerberusStart(userId, userName, minutes);
+          }
+        }
+      },
+      default: "initiate"
+    },
+    { classes: ["muthur-cerberus-dialog"], width: 320 }
+  ).render(true);
+}
+
+async function handleCerberusApproval(data) {
+  if (data.targetUserId !== game.user.id) return;
+
+  const app = MuthurPlayerApp.current;
+  if (!data.approved) {
+    if (app) {
+      app.localPending.push({
+        id: foundry.utils.randomID(),
+        type: "system",
+        text: localize("MUTHUR.Cerberus.RequestDenied"),
+        timestamp: Date.now(),
+        local: true
+      });
+      app.render();
+    }
+    return;
+  }
+
+  app?._showCerberusConfirmation(clampCerberusMinutes(data.minutes));
+}
+
+async function handleCerberusStart(data) {
+  CerberusProtocol.begin(data);
+  if (game.user.isGM) {
+    await pushTranscriptEntry({
+      id: foundry.utils.randomID(),
+      type: "system",
+      text: localize("MUTHUR.Cerberus.Warning"),
+      authorId: "muthur",
+      scope: "all",
+      timestamp: Date.now()
+    });
+  }
+}
+
+/* -------------------------------------------- */
 /*  Player Terminal Application                 */
 /* -------------------------------------------- */
 
@@ -604,12 +1136,14 @@ class MuthurPlayerApp extends HandlebarsApplicationMixin(ApplicationV2) {
     this._animatedIds = new Set();
     this._animatingIds = new Set();
     this._heardLineIds = new Set();
+    this._hiddenLineIds = new Set();
     this._bootSuppressed = false;
     this._bootEntry = null;
     this._bootAnimating = false;
     this._renderLocked = false;
     this._persistedMarked = false;
     this._animationQueue = Promise.resolve();
+    this._cerberusPendingMinutes = null;
   }
 
   render(options) {
@@ -764,24 +1298,29 @@ class MuthurPlayerApp extends HandlebarsApplicationMixin(ApplicationV2) {
     const combined = [...persisted, ...this.localPending];
     if (this._bootEntry) combined.unshift(this._bootEntry);
     combined.sort((a, b) => (a.timestamp ?? 0) - (b.timestamp ?? 0));
-    return combined;
+    return combined.filter((entry) => {
+      const id = entry.id ?? entry.tempId;
+      return !id || !this._hiddenLineIds.has(String(id));
+    });
   }
 
   async _prepareContext(_options) {
     if (this.waiting) {
       return {
-        waiting: true,
-        waitingTitle: localize("MUTHUR.WindowPlayerTitle"),
-        waitingMessage: localize("MUTHUR.Session.WaitingForGM"),
-        waitingDetail: localize("MUTHUR.Session.WaitingDetail")
-      };
+      waiting: true,
+      waitingTitle: localize("MUTHUR.WindowPlayerTitle"),
+      waitingMessage: localize("MUTHUR.Session.WaitingForGM"),
+      waitingDetail: localize("MUTHUR.Session.WaitingDetail"),
+      ...getCerberusContext()
+    };
     }
 
     if (this.booting) {
       return {
         waiting: false,
         booting: true,
-        bootLogoAlt: localize("MUTHUR.Boot.LogoAlt")
+        bootLogoAlt: localize("MUTHUR.Boot.LogoAlt"),
+        ...getCerberusContext()
       };
     }
 
@@ -807,11 +1346,14 @@ class MuthurPlayerApp extends HandlebarsApplicationMixin(ApplicationV2) {
       lines,
       readOnly: this.readOnly,
       prompt: resolveLocalizedText(game.settings.get(MODULE_ID, "prompt"), "MUTHUR.DefaultPrompt"),
-      inputPlaceholder: localize("MUTHUR.InputPlaceholder")
+      inputPlaceholder: localize("MUTHUR.InputPlaceholder"),
+      ...getCerberusContext()
     };
   }
 
   _onRender(_context, _options) {
+    bindCerberusInlineStop(this.element);
+
     if (this.waiting) {
       this._startWaitingDots();
       return;
@@ -846,6 +1388,7 @@ class MuthurPlayerApp extends HandlebarsApplicationMixin(ApplicationV2) {
         if (!this.element?.isConnected) return;
         this._animateNewLines();
         this._playNewLineSounds();
+        this._injectCerberusConfirmation();
         this._scrollToBottom();
       });
     });
@@ -993,6 +1536,60 @@ class MuthurPlayerApp extends HandlebarsApplicationMixin(ApplicationV2) {
     if (log) log.scrollTop = log.scrollHeight;
   }
 
+  _clearCerberusConfirmation() {
+    this._cerberusPendingMinutes = null;
+    this.element?.querySelector(".muthur-cerberus-confirm")?.remove();
+  }
+
+  _injectCerberusConfirmation() {
+    if (this._cerberusPendingMinutes == null || this.readOnly) return;
+    const log = this.element?.querySelector(".muthur-log");
+    if (!log || log.querySelector(".muthur-cerberus-confirm")) return;
+
+    const minutes = this._cerberusPendingMinutes;
+    const block = document.createElement("div");
+    block.className = "muthur-cerberus-confirm";
+    block.innerHTML = `
+      <div class="muthur-line muthur-type-system">${escapeHtml(localize("MUTHUR.Cerberus.Confirmation")).replace(/\n/g, "<br>")}</div>
+      <div class="muthur-cerberus-confirm-actions">
+        <button type="button" class="muthur-cerberus-confirm-yes">${escapeHtml(localize("MUTHUR.Cerberus.Confirm"))}</button>
+        <button type="button" class="muthur-cerberus-confirm-no">${escapeHtml(localize("MUTHUR.Cerberus.Cancel"))}</button>
+      </div>
+    `;
+    log.appendChild(block);
+
+    block.querySelector(".muthur-cerberus-confirm-yes")?.addEventListener("click", () => {
+      this._clearCerberusConfirmation();
+      this.localPending.push({
+        id: foundry.utils.randomID(),
+        type: "system",
+        text: localize("MUTHUR.Cerberus.Confirmed"),
+        timestamp: Date.now(),
+        local: true
+      });
+      this.render();
+      emitCerberusStart(game.user.id, game.user.name, minutes);
+    });
+
+    block.querySelector(".muthur-cerberus-confirm-no")?.addEventListener("click", () => {
+      this._clearCerberusConfirmation();
+      this.localPending.push({
+        id: foundry.utils.randomID(),
+        type: "system",
+        text: localize("MUTHUR.Cerberus.Cancelled"),
+        timestamp: Date.now(),
+        local: true
+      });
+      this.render();
+    });
+  }
+
+  _showCerberusConfirmation(minutes) {
+    this._cerberusPendingMinutes = clampCerberusMinutes(minutes);
+    this._injectCerberusConfirmation();
+    this._scrollToBottom();
+  }
+
   _onKeyDown(event) {
     const input = event.currentTarget;
     if (event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
@@ -1033,9 +1630,11 @@ class MuthurPlayerApp extends HandlebarsApplicationMixin(ApplicationV2) {
     // A couple of purely local, client-side conveniences.
     if (lower === "clear" || lower === "cls") {
       MuthurSounds.stopReplySound();
+      for (const entry of this._buildLines()) {
+        const id = entry.id ?? entry.tempId;
+        if (id) this._hiddenLineIds.add(String(id));
+      }
       this.localPending = [];
-      this._animatedIds.clear();
-      this._animatingIds.clear();
       this._bootEntry = null;
       this._bootSuppressed = true;
       this.render();
@@ -1053,6 +1652,56 @@ class MuthurPlayerApp extends HandlebarsApplicationMixin(ApplicationV2) {
         local: true
       });
       this.render();
+      return;
+    }
+
+    if (isCerberusCommand(text)) {
+      const tempId = foundry.utils.randomID();
+      this.localPending.push({
+        tempId,
+        id: tempId,
+        type: "input",
+        text,
+        authorId: game.user.id,
+        authorName: game.user.name,
+        timestamp: Date.now(),
+        pending: true
+      });
+      this.render();
+
+      if (!isCerberusAllowed()) {
+        this.localPending.push({
+          id: foundry.utils.randomID(),
+          type: "system",
+          text: localize("MUTHUR.Cerberus.Disabled"),
+          timestamp: Date.now(),
+          local: true
+        });
+        this.render();
+        return;
+      }
+
+      if (game.user.isGM) {
+        showCerberusGMDirectDialog(game.user.id, game.user.name);
+        return;
+      }
+
+      this.localPending.push({
+        id: foundry.utils.randomID(),
+        type: "system",
+        text: localize("MUTHUR.Cerberus.Waiting"),
+        timestamp: Date.now(),
+        local: true
+      });
+      this.render();
+
+      game.socket.emit(SOCKET, {
+        action: "cerberus-request",
+        tempId,
+        userId: game.user.id,
+        userName: game.user.name,
+        text
+      });
       return;
     }
 
@@ -1159,7 +1808,8 @@ class MuthurGMApp extends HandlebarsApplicationMixin(ApplicationV2) {
       sendTitle: localize("MUTHUR.GM.Send"),
       forceOpenLabel: localize("MUTHUR.GM.ForceOpen"),
       systemAlertLabel: localize("MUTHUR.GM.SystemAlert"),
-      clearLabel: localize("MUTHUR.GM.ClearTranscript")
+      clearLabel: localize("MUTHUR.GM.ClearTranscript"),
+      ...getCerberusContext()
     };
   }
 
@@ -1243,6 +1893,7 @@ class MuthurGMApp extends HandlebarsApplicationMixin(ApplicationV2) {
   }
 
   _onRender(_context, _options) {
+    bindCerberusInlineStop(this.element);
     this._bindHelpButton();
     this._scrollToBottom();
 
@@ -1463,6 +2114,39 @@ async function onSocketEvent(data) {
     return;
   }
 
+  if (data.action === "cerberus-request") {
+    if (!game.user.isGM) return;
+    await pushTranscriptEntry({
+      id: foundry.utils.randomID(),
+      tempId: data.tempId,
+      type: "input",
+      text: data.text,
+      authorId: data.userId,
+      authorName: data.userName,
+      scope: [data.userId],
+      timestamp: Date.now()
+    });
+    if (isCerberusAllowed()) {
+      showCerberusApprovalDialog(data.userId, data.userName, data.tempId);
+    }
+    return;
+  }
+
+  if (data.action === "cerberus-approval") {
+    await handleCerberusApproval(data);
+    return;
+  }
+
+  if (data.action === "cerberus-start") {
+    await handleCerberusStart(data);
+    return;
+  }
+
+  if (data.action === "cerberus-stop") {
+    CerberusProtocol.stop();
+    return;
+  }
+
   if (data.action === "command") {
     if (!game.user.isGM) return;
 
@@ -1499,6 +2183,7 @@ async function onSocketEvent(data) {
 /* -------------------------------------------- */
 
 Hooks.once("init", () => {
+  ensureCerberusStyles();
   bindSettingsConfigTextareas();
 
   game.settings.register(MODULE_ID, "transcript", {
@@ -1577,6 +2262,15 @@ Hooks.once("init", () => {
   game.settings.register(MODULE_ID, "enableScriptedResponses", {
     name: "MUTHUR.SettingScriptedResponsesName",
     hint: "MUTHUR.SettingScriptedResponsesHint",
+    scope: "world",
+    config: true,
+    type: Boolean,
+    default: true
+  });
+
+  game.settings.register(MODULE_ID, "allowCerberus", {
+    name: "MUTHUR.SettingAllowCerberusName",
+    hint: "MUTHUR.SettingAllowCerberusHint",
     scope: "world",
     config: true,
     type: Boolean,

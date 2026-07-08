@@ -1,4 +1,13 @@
 <div class="muthur-app">
+  {{#if cerberusActive}}
+  <div class="muthur-cerberus-inline">
+    <div class="muthur-cerberus-inline-title">{{cerberusTitle}}</div>
+    <div class="muthur-cerberus-inline-countdown" data-muthur-cerberus-countdown>{{cerberusTime}}</div>
+    {{#if cerberusShowStop}}
+    <button type="button" class="muthur-cerberus-inline-stop">{{cerberusStopLabel}}</button>
+    {{/if}}
+  </div>
+  {{/if}}
   {{#if waiting}}
   <div class="muthur-crt muthur-waiting-screen">
     <div class="muthur-waiting-content">
